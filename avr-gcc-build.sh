@@ -42,14 +42,11 @@ trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
 
 
 # http://www.nongnu.org/avr-libc/user-manual/install_tools.html
-
-# VM with 4x AMD Ryzen 5 5600X cores & 5.5GB RAM
-# Debian 11 & GCC 10.2.1
-# AVR-GCC 12.1.0 compile time: Around 1 hour for all 3 hosts
+# https://avrdudes.github.io/avr-libc/avr-libc-user-manual/install_tools.html
 
 # For optimum compile time this should generally be set to the number of CPU cores your machine has.
-# Some systems with not much RAM may fail with "collect2: fatal error: ld terminated with signal 9 [Killed]", if this happens try reducing the JOBCOUNT value or add more RAM.
-# In my case using GCC 8.3.0 on Debian 10 with 2GB RAM was fine, but Debian 11 and GCC 10.2.1 needed 5.5GB
+# Some systems with not much RAM may fail with "collect2: fatal error: ld terminated with signal 9 [Killed]".
+# If this happens try reducing the JOBCOUNT value or add more RAM.
 JOBCOUNT=${JOBCOUNT:-$(getconf _NPROCESSORS_ONLN)}
 
 # Build for Linux
