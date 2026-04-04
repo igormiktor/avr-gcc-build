@@ -52,6 +52,9 @@ trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
 # If this happens try reducing the JOBCOUNT value or add more RAM.
 JOBCOUNT=${JOBCOUNT:-$(getconf _NPROCESSORS_ONLN)}
 
+# Keep downloaded sources around (to avoid needing to redownload them)
+KEEP_DOWNLOADS=${KEEP_DOWNLOADS:-1}
+
 # Build for Linux
 # A Linux AVR-GCC toolchain is required to build a Windows toolchain
 # If the Linux toolchain has already been built then you can set this to 0
@@ -189,43 +192,56 @@ cleanup()
 	[[ $FOR_WINX86 -eq 1 ]] && makeDir "$PREFIX_GCC_WINX86"
 	[[ $FOR_WINX64 -eq 1 ]] && makeDir "$PREFIX_GCC_WINX64"
 
-	log "Clearing old downloads..."
-	rm -f "$NAME_BINUTILS.tar.xz"
+	log "Clearing expansions of downloads..."
 	rm -rf "$NAME_BINUTILS"
-	rm -f "$NAME_GCC.tar.xz"
 	rm -rf "$NAME_GCC"
-	rm -f "$NAME_GDB.tar.xz"
 	rm -rf "$NAME_GDB"
-	rm -f "$NAME_GMP.tar.xz"
 	rm -rf "$NAME_GMP"
-	rm -f "$NAME_MPFR.tar.xz"
 	rm -rf "$NAME_MPFR"
-	rm -f "${NAME_EXPAT[1]}.tar.xz"
 	rm -rf "${NAME_EXPAT[1]}"
-	rm -f "${NAME_LIBC[1]}.tar.bz2"
 	rm -rf "${NAME_LIBC[1]}"
+
+	if [[ $KEEP_DOWNLOADS -eq 0 ]]; then
+		log "Clearing downloads themselves..."
+		rm -f "$NAME_BINUTILS.tar.xz"
+		rm -f "$NAME_GCC.tar.xz"
+		rm -f "$NAME_GDB.tar.xz"
+		rm -f "$NAME_GMP.tar.xz"
+		rm -f "$NAME_MPFR.tar.xz"
+		rm -f "${NAME_EXPAT[1]}.tar.xz"
+		rm -f "${NAME_LIBC[1]}.tar.bz2"
+	fi
 }
 
 downloadSources()
 {
+	# Only download the sources we don't already have
 	log "Downloading sources..."
-	[[ $BUILD_BINUTILS -eq 1 ]] && log "$NAME_BINUTILS" && wget https://ftpmirror.gnu.org/binutils/$NAME_BINUTILS.tar.xz
-	[[ $BUILD_GCC -eq 1 ]] && log "$NAME_GCC" && wget https://ftpmirror.gnu.org/gcc/$NAME_GCC/$NAME_GCC.tar.xz
-	if [[ $BUILD_GDB -eq 1 ]]; then
-		log "$NAME_GDB"
-		wget https://ftpmirror.gnu.org/gdb/$NAME_GDB.tar.xz
-		if [[ $FOR_WINX86 -eq 1 ]] || [[ $FOR_WINX64 -eq 1 ]]; then
-			log "$NAME_GMP"
-			wget https://ftpmirror.gnu.org/gmp/$NAME_GMP.tar.xz
-			log "$NAME_MPFR"
-			wget https://ftpmirror.gnu.org/mpfr/$NAME_MPFR.tar.xz
-			log "${NAME_EXPAT[1]}"
-			wget https://github.com/libexpat/libexpat/releases/download/${NAME_EXPAT[0]}/${NAME_EXPAT[1]}.tar.xz
+	if [[ ! -f "$NAME_BINUTILS.tar.xz" ]]; then
+		[[ $BUILD_BINUTILS -eq 1 ]] && log "$NAME_BINUTILS" && wget "https://ftpmirror.gnu.org/binutils/$NAME_BINUTILS.tar.xz"
+	fi
+	if [[ ! -f "$NAME_GCC.tar.xz" ]]; then
+		[[ $BUILD_GCC -eq 1 ]] && log "$NAME_GCC" && wget "https://ftpmirror.gnu.org/gcc/$NAME_GCC/$NAME_GCC.tar.xz"
+	fi
+	if [[ -f "$NAME_GDB.tar.xz" ]]; then
+		if [[ $BUILD_GDB -eq 1 ]]; then
+			log "$NAME_GDB"
+			wget "https://ftpmirror.gnu.org/gdb/$NAME_GDB.tar.xz"
+			if [[ $FOR_WINX86 -eq 1 ]] || [[ $FOR_WINX64 -eq 1 ]]; then
+				log "$NAME_GMP"
+				wget "https://ftpmirror.gnu.org/gmp/$NAME_GMP.tar.xz"
+				log "$NAME_MPFR"
+				wget "https://ftpmirror.gnu.org/mpfr/$NAME_MPFR.tar.xz"
+				log "${NAME_EXPAT[1]}"
+				wget "https://github.com/libexpat/libexpat/releases/download/${NAME_EXPAT[0]}/${NAME_EXPAT[1]}.tar.xz"
+			fi
 		fi
 	fi
-	if [[ $BUILD_LIBC -eq 1 ]]; then
-		log "${NAME_LIBC[1]}"
-		wget https://github.com/avrdudes/avr-libc/releases/download/${NAME_LIBC[0]}/${NAME_LIBC[1]}.tar.bz2
+	if [[ ! -f "${NAME_LIBC[1]}.tar.bz2" ]]; then
+		if [[ $BUILD_LIBC -eq 1 ]]; then
+			log "${NAME_LIBC[1]}"
+			wget "https://github.com/avrdudes/avr-libc/releases/download/${NAME_LIBC[0]}/${NAME_LIBC[1]}.tar.bz2"
+		fi
 	fi
 
 #	[[ $BUILD_MAKE -eq 1 ]] && wget http://ftp.gnu.org/gnu/make/$NAME_MAKE.tar.gz
