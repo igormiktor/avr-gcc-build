@@ -353,7 +353,7 @@ buildGDB()
 
 	# For some reason we need some random command here otherwise
 	# the script exits with no error when FOR_WINX64=0
-	echo "" > /dev/null
+	# echo "" > /dev/null
 }
 
 buildAVRLIBC()
