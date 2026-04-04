@@ -298,6 +298,29 @@ buildGCC()
 	cd ../../
 }
 
+buildGDBWin()
+{
+	log "GMP..."
+	cd "$NAME_GMP/obj"
+	confMake "$TMP_DIR/$2" --host="$2"
+	cd ../../
+	
+	log "MPFR..."
+	cd "$NAME_MPFR/obj"
+	confMake "$TMP_DIR/$2" "--with-gmp=$TMP_DIR/$2 --disable-shared --enable-static" --host="$2"
+	cd ../../
+
+	log "Expat..."
+	cd "${NAME_EXPAT[1]}/obj"
+	confMake "$TMP_DIR/$2" "--disable-shared --enable-static" --host="$2" "../conftools/config.guess"
+	cd ../../
+
+	log "GDB..."
+	cd "$NAME_GDB/obj-avr"
+	confMake "$1" "--with-gmp=$TMP_DIR/$2 --with-mpfr=$TMP_DIR/$2 --with-libexpat-prefix=$TMP_DIR/$2 $OPTS_GDB" --host="$2"
+	cd ../../
+}
+
 buildGDB()
 {
 	log "***GDB (and GMP, MPFR, Expat for Windows)***"
@@ -306,7 +329,7 @@ buildGDB()
 	log "Extracting..."
 	tar xf "$NAME_GDB.tar.xz"
 	mkdir -p "$NAME_GDB/obj-avr"
-	if [[ $FOR_WINX86 -eq 1 ]] || [[ $FOR_WINX64 -eq 1 ]]; then
+	if [[ $FOR_WINX86 -ne 0 ]] || [[ $FOR_WINX64 -ne 0 ]]; then
 		tar xf "$NAME_GMP.tar.xz"
 		mkdir -p "$NAME_GMP/obj"
 		tar xf "$NAME_MPFR.tar.xz"
@@ -322,31 +345,11 @@ buildGDB()
 		cd ../../
 	fi
 
-	buildGDBWin()
-	{
-		log "GMP..."
-		cd "$NAME_GMP/obj"
-		confMake "$TMP_DIR/$2" --host="$2"
-		cd ../../
-		
-		log "MPFR..."
-		cd "$NAME_MPFR/obj"
-		confMake "$TMP_DIR/$2" "--with-gmp=$TMP_DIR/$2 --disable-shared --enable-static" --host="$2"
-		cd ../../
-
-		log "Expat..."
-		cd "${NAME_EXPAT[1]}/obj"
-		confMake "$TMP_DIR/$2" "--disable-shared --enable-static" --host="$2" "../conftools/config.guess"
-		cd ../../
-
-		log "GDB..."
-		cd "$NAME_GDB/obj-avr"
-		confMake "$1" "--with-gmp=$TMP_DIR/$2 --with-mpfr=$TMP_DIR/$2 --with-libexpat-prefix=$TMP_DIR/$2 $OPTS_GDB" --host="$2"
-		cd ../../
-	}
-
-	[[ $FOR_WINX86 -eq 1 ]] && log "Making for Windows x86..." && buildGDBWin "$PREFIX_GCC_WINX86" $HOST_WINX86
-	[[ $FOR_WINX64 -eq 1 ]] && log "Making for Windows x64..." && buildGDBWin "$PREFIX_GCC_WINX64" $HOST_WINX64
+	if  [[ $FOR_WINX86 -ne 0 ]] || [[ $FOR_WINX64 -ne 0 ]]; then
+		makeDir "$TMP_DIR"
+		[[ $FOR_WINX86 -eq 1 ]] && log "Making for Windows x86..." && buildGDBWin "$PREFIX_GCC_WINX86" $HOST_WINX86
+		[[ $FOR_WINX64 -eq 1 ]] && log "Making for Windows x64..." && buildGDBWin "$PREFIX_GCC_WINX64" $HOST_WINX64
+	fi
 
 	# For some reason we need some random command here otherwise
 	# the script exits with no error when FOR_WINX64=0
