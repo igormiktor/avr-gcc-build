@@ -16,7 +16,7 @@ backtrace()
 {
     local deptn=${#FUNCNAME[@]}
     local start=${1:-1}
-    for ((i=$start; i<$deptn; i++)); do
+    for ((i=start; i<deptn; i++)); do
         local func="${FUNCNAME[$i]}"
         local line="${BASH_LINENO[$((i-1))]}"
         local src="${BASH_SOURCE[$((i-1))]}"
@@ -61,7 +61,7 @@ FOR_LINUX=${FOR_LINUX:-1}
 FOR_WINX86=${FOR_WINX86:-0}
 
 # Build for 64 bit Windows
-FOR_WINX64=${FOR_WINX64:-1}
+FOR_WINX64=${FOR_WINX64:-0}
 
 # Build Binutils for selected OSs
 BUILD_BINUTILS=${BUILD_BINUTILS:-1}
@@ -147,7 +147,10 @@ log()
 
 installPackages()
 {
-	local requiredPackages=("wget" "make" "mingw-w64" "gcc" "g++" "bzip2" "xz-utils" "autoconf" "texinfo" "libgmp-dev" "libmpfr-dev" "libexpat1-dev")
+	local requiredPackages=("wget" "make" "gcc" "g++" "bzip2" "xz-utils" "autoconf" "texinfo" "libgmp-dev" "libmpfr-dev" "libexpat1-dev")
+	if [[ $FOR_WINX64 -ne 0 ]] || [[ $FOR_WINX86 -ne 0 ]]; then
+			requiredPackages+=("mingw-w64")
+	fi
 
 	if [[ $EUID -ne 0 ]]; then
 		log "Not running as root user. Checking whether all required packages are installed..."
@@ -175,7 +178,7 @@ installPackages()
 
 makeDir()
 {
-	rm -rf "$1/"
+	rm -rf "$1"
 	mkdir -p "$1"
 }
 
@@ -210,20 +213,20 @@ cleanup()
 	[[ $FOR_WINX64 -eq 1 ]] && makeDir "$PREFIX_GCC_WINX64"
 
 	log "Clearing old downloads..."
-	rm -f $NAME_BINUTILS.tar.xz
-	rm -rf $NAME_BINUTILS
-	rm -f $NAME_GCC.tar.xz
-	rm -rf $NAME_GCC
-	rm -f $NAME_GDB.tar.xz
-	rm -rf $NAME_GDB
-	rm -f $NAME_GMP.tar.xz
-	rm -rf $NAME_GMP
-	rm -f $NAME_MPFR.tar.xz
-	rm -rf $NAME_MPFR
-	rm -f ${NAME_EXPAT[1]}.tar.xz
-	rm -rf ${NAME_EXPAT[1]}
-	rm -f ${NAME_LIBC[1]}.tar.bz2
-	rm -rf ${NAME_LIBC[1]}
+	rm -f "$NAME_BINUTILS.tar.xz"
+	rm -rf "$NAME_BINUTILS"
+	rm -f "$NAME_GCC.tar.xz"
+	rm -rf "$NAME_GCC"
+	rm -f "$NAME_GDB.tar.xz"
+	rm -rf "$NAME_GDB"
+	rm -f "$NAME_GMP.tar.xz"
+	rm -rf "$NAME_GMP"
+	rm -f "$NAME_MPFR.tar.xz"
+	rm -rf "$NAME_MPFR"
+	rm -f "${NAME_EXPAT[1]}.tar.xz"
+	rm -rf "${NAME_EXPAT[1]}"
+	rm -f "${NAME_LIBC[1]}.tar.bz2"
+	rm -rf "${NAME_LIBC[1]}"
 }
 
 downloadSources()
@@ -254,10 +257,10 @@ downloadSources()
 
 confMake()
 {
-	../configure --prefix=$1 $2 $3 --build=`${4:-../config.guess}`
+	../configure --prefix="$1" $2 $3 --build="$(${4:-../config.guess})"
 	make -j $JOBCOUNT
 	make install-strip
-	rm -rf *
+	rm -rf -- *
 }
 
 buildBinutils()
@@ -266,9 +269,9 @@ buildBinutils()
 	[[ $BUILD_BINUTILS -ne 1 ]] && log "(Skipping)" && return 0
 
 	log "Extracting..."
-	tar xf $NAME_BINUTILS.tar.xz
-	mkdir -p $NAME_BINUTILS/obj-avr
-	cd $NAME_BINUTILS/obj-avr
+	tar xf "$NAME_BINUTILS.tar.xz"
+	mkdir -p "$NAME_BINUTILS/obj-avr"
+	cd "$NAME_BINUTILS/obj-avr"
 
 	[[ $FOR_LINUX -eq 1 ]] && log "Making for Linux..." && confMake "$PREFIX_GCC_LINUX" "$OPTS_BINUTILS"
 	[[ $FOR_WINX86 -eq 1 ]] && log "Making for Windows x86..." && confMake "$PREFIX_GCC_WINX86" "$OPTS_BINUTILS" --host=$HOST_WINX86
@@ -283,9 +286,9 @@ buildGCC()
 	[[ $BUILD_GCC -ne 1 ]] && log "(Skipping)" && return 0
 
 	log "Extracting..."
-	tar xf $NAME_GCC.tar.xz
-	mkdir -p $NAME_GCC/obj-avr
-	cd $NAME_GCC
+	tar xf "$NAME_GCC.tar.xz"
+	mkdir -p "$NAME_GCC/obj-avr"
+	cd "$NAME_GCC"
 	
 	log "Getting prerequisites..."
 	chmod +x ./contrib/download_prerequisites
@@ -307,20 +310,20 @@ buildGDB()
 	[[ $BUILD_GDB -ne 1 ]] && log "(Skipping)" && return 0
 
 	log "Extracting..."
-	tar xf $NAME_GDB.tar.xz
-	mkdir -p $NAME_GDB/obj-avr
+	tar xf "$NAME_GDB.tar.xz"
+	mkdir -p "$NAME_GDB/obj-avr"
 	if [[ $FOR_WINX86 -eq 1 ]] || [[ $FOR_WINX64 -eq 1 ]]; then
-		tar xf $NAME_GMP.tar.xz
-		mkdir -p $NAME_GMP/obj
-		tar xf $NAME_MPFR.tar.xz
-		mkdir -p $NAME_MPFR/obj
-		tar xf ${NAME_EXPAT[1]}.tar.xz
-		mkdir -p ${NAME_EXPAT[1]}/obj
+		tar xf "$NAME_GMP.tar.xz"
+		mkdir -p "$NAME_GMP/obj"
+		tar xf "$NAME_MPFR.tar.xz"
+		mkdir -p "$NAME_MPFR/obj"
+		tar xf "${NAME_EXPAT[1]}.tar.xz"
+		mkdir -p "${NAME_EXPAT[1]}/obj"
 	fi
 
 	if [[ $FOR_LINUX -eq 1 ]]; then
 		log "Making for Linux..."
-		cd $NAME_GDB/obj-avr
+		cd "$NAME_GDB/obj-avr"
 		confMake "$PREFIX_GCC_LINUX" "$OPTS_GDB"
 		cd ../../
 	fi
@@ -328,23 +331,23 @@ buildGDB()
 	buildGDBWin()
 	{
 		log "GMP..."
-		cd $NAME_GMP/obj
-		confMake $TMP_DIR/$2 --host=$2
+		cd "$NAME_GMP/obj"
+		confMake "$TMP_DIR/$2" --host="$2"
 		cd ../../
 		
 		log "MPFR..."
-		cd $NAME_MPFR/obj
-		confMake $TMP_DIR/$2 "--with-gmp=$TMP_DIR/$2 --disable-shared --enable-static" --host=$2
+		cd "$NAME_MPFR/obj"
+		confMake "$TMP_DIR/$2" "--with-gmp=$TMP_DIR/$2 --disable-shared --enable-static" --host="$2"
 		cd ../../
 
 		log "Expat..."
-		cd ${NAME_EXPAT[1]}/obj
-		confMake $TMP_DIR/$2 "--disable-shared --enable-static" --host=$2 "../conftools/config.guess"
+		cd "${NAME_EXPAT[1]}/obj"
+		confMake "$TMP_DIR/$2" "--disable-shared --enable-static" --host="$2" "../conftools/config.guess"
 		cd ../../
 
 		log "GDB..."
-		cd $NAME_GDB/obj-avr
-		confMake "$1" "--with-gmp=$TMP_DIR/$2 --with-mpfr=$TMP_DIR/$2 --with-libexpat-prefix=$TMP_DIR/$2 $OPTS_GDB" --host=$2
+		cd "$NAME_GDB/obj-avr"
+		confMake "$1" "--with-gmp=$TMP_DIR/$2 --with-mpfr=$TMP_DIR/$2 --with-libexpat-prefix=$TMP_DIR/$2 $OPTS_GDB" --host="$2"
 		cd ../../
 	}
 
@@ -362,12 +365,12 @@ buildAVRLIBC()
 	[[ $BUILD_LIBC -ne 1 ]] && log "(Skipping)" && return 0
 
 	log "Extracting..."
-	bunzip2 -c ${NAME_LIBC[1]}.tar.bz2 | tar xf -
-	mkdir -p ${NAME_LIBC[1]}/obj-avr
-	cd ${NAME_LIBC[1]}/obj-avr
+	bunzip2 -c "${NAME_LIBC[1]}.tar.bz2" | tar xf -
+	mkdir -p "${NAME_LIBC[1]}/obj-avr"
+	cd "${NAME_LIBC[1]}/obj-avr"
 	
 	log "Making..."
-	../configure "$OPTS_LIBC" --host=avr --build=`../config.guess`
+	../configure "$OPTS_LIBC" --host=avr --build="../config.guess"
 	make -j $JOBCOUNT
 
 	log "Installing into toolchains..."
@@ -395,7 +398,7 @@ buildGDB
 buildAVRLIBC
 
 TIME_END=$(date +%s)
-TIME_RUN=$(($TIME_END - $TIME_START))
+TIME_RUN=$((TIME_END - TIME_START))
 
 echo ""
 log "Done in $TIME_RUN seconds"
