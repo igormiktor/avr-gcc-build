@@ -12,6 +12,7 @@ CWD=$(pwd)
 # ++++ Error Handling and Backtracing ++++
 set -eE -o functrace
 
+# shellcheck disable=SC2329
 backtrace()
 {
     local deptn=${#FUNCNAME[@]}
@@ -20,6 +21,7 @@ backtrace()
         local func="${FUNCNAME[$i]}"
         local line="${BASH_LINENO[$((i-1))]}"
         local src="${BASH_SOURCE[$((i-1))]}"
+		# shellcheck disable=SC2086
         printf '%*s' $i '' # indent
         echo "at: $func(), $src, line $line"
     done
@@ -27,6 +29,7 @@ backtrace()
 
 suppressError=0
 
+# shellcheck disable=SC2329
 failure()
 {
 	[[ $suppressError -ne 0 ]] && return 0
@@ -254,7 +257,9 @@ downloadSources()
 
 confMake()
 {
+	# shellcheck disable=SC2086
 	../configure --prefix="$1" $2 $3 --build="$(${4:-../config.guess})"
+	# shellcheck disable=SC2086
 	make -j $JOBCOUNT
 	make install-strip
 	rm -rf -- *
@@ -367,7 +372,8 @@ buildAVRLIBC()
 	cd "${NAME_LIBC[1]}/obj-avr"
 	
 	log "Making..."
-	../configure "$OPTS_LIBC" --host=avr --build="../config.guess"
+	../configure "$OPTS_LIBC" --host=avr --build="$(../config.guess)"
+	# shellcheck disable=SC2086
 	make -j $JOBCOUNT
 
 	log "Installing into toolchains..."
