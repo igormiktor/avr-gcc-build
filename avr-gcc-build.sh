@@ -397,8 +397,8 @@ cleanup
 downloadSources
 buildBinutils
 buildGCC
-buildGDB
 buildAVRLIBC
+buildGDB
 
 TIME_END=$(date +%s)
 TIME_RUN=$((TIME_END - TIME_START))
