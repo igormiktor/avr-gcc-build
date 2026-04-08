@@ -223,7 +223,7 @@ downloadSources()
 	if [[ ! -f "$NAME_GCC.tar.xz" ]]; then
 		[[ $BUILD_GCC -eq 1 ]] && log "$NAME_GCC" && wget "https://ftpmirror.gnu.org/gcc/$NAME_GCC/$NAME_GCC.tar.xz"
 	fi
-	if [[ -f "$NAME_GDB.tar.xz" ]]; then
+	if [[ ! -f "$NAME_GDB.tar.xz" ]]; then
 		if [[ $BUILD_GDB -eq 1 ]]; then
 			log "$NAME_GDB"
 			wget "https://ftpmirror.gnu.org/gdb/$NAME_GDB.tar.xz"
