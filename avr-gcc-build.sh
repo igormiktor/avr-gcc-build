@@ -44,6 +44,12 @@ trap 'failure ${LINENO} "$BASH_COMMAND"' ERR
 # ---- Erorr Handling and Backtracing ----
 
 
+# Is there a file of preferences for builds and versions?
+if [[ -f preferences.sh ]]; then
+	source preferences.sh
+	echo "Using preferences..."
+fi
+
 # http://www.nongnu.org/avr-libc/user-manual/install_tools.html
 # https://avrdudes.github.io/avr-libc/avr-libc-user-manual/install_tools.html
 
@@ -86,12 +92,29 @@ BUILD_LIBC=${BUILD_LIBC:-1}
 NAME_BINUTILS="binutils-${VER_BINUTILS:-2.45}"
 NAME_GCC="gcc-${VER_GCC:-15.2.0}"
 NAME_GDB="gdb-${VER_GDB:-16.3}"
-NAME_GMP="gmp-6.3.0" # GDB 11+ needs libgmp
-NAME_MPFR="mpfr-4.2.2" # GDB 14+ needs libmpfr
-NAME_EXPAT=("R_2_7_1" "expat-2.7.1") # GDB XML support
-#NAME_MAKE="make-4.4.1"
-#NAME_COREUTILS="coreutils-9.6"
-NAME_LIBC=("avr-libc-2_2_1-release" "avr-libc-2.2.1")
+NAME_GMP="gmp-${VER_GMP:-6.3.0}" # GDB 11+ needs libgmp
+NAME_MPFR="${VER_MPFR:-4.2.2}" # GDB 14+ needs libmpfr
+
+VER_EXPAT="${VER_EXPAT:-2.7.1}"
+EXPAT_MAJ=${VER_EXPAT%%.*}
+EXPAT_TMP=${VER_EXPAT#*.}
+EXPAT_MIN=${EXPAT_TMP%%.*}
+EXPAT_PATCH=${EXPAT_TMP#*.}
+NAME_EXPAT=("R_${EXPAT_MAJ}_${EXPAT_MIN}_${EXPAT_PATCH}" "expat-${VER_EXPAT}") # GDB XML support
+
+VER_LIBC="${VER_LIBC:-2.3.1}"
+LIBC_MAJ=${VER_LIBC%%.*}
+LIBC_TMP=${VER_LIBC#*.}
+LIBC_MIN=${LIBC_TMP%%.*}
+LIBC_PATCH=${LIBC_TMP#*.}
+NAME_LIBC=("avr-libc-${LIBC_MAJ}_${LIBC_MIN}_${LIBC_PATCH}-release" "avr-libc-${VER_LIBC}")
+
+# Versions 2.2.0 and later live on GitHub, but versions 2.1.0 and prior live on savannah.gnu.org
+if [[ $LIBC_MAJ -gt 2 ]] || [[ $LIBC_MIN -gt 1 ]]; then
+	LIBC_SOURCE="https://github.com/avrdudes/avr-libc/releases/download/${NAME_LIBC[0]}/${NAME_LIBC[1]}.tar.bz2"
+else
+	LIBC_SOURCE="https://ftp.mirrorservice.org/sites/download.savannah.gnu.org/releases/avr-libc/${NAME_LIBC[1]}.tar.bz2"
+fi
 
 # Output locations for built toolchains
 BASE=${BASE:-${CWD}/build/}
@@ -101,6 +124,11 @@ PREFIX_GCC_WINX64=${BASE}avr-${NAME_GCC}-x64-windows
 
 HOST_WINX86="i686-w64-mingw32"
 HOST_WINX64="x86_64-w64-mingw32"
+
+# Leave a copy of prefences in the build directory
+if [[ -f preferences.sh ]]; then
+	cp preferences.sh "${BASE}"
+fi
 
 # Uncomment the next 2 export lines and replace "--enable-plugin"
 # with "--disable-plugin" in OPTS_GCC for a fully static linux build.
@@ -240,7 +268,7 @@ downloadSources()
 	if [[ ! -f "${NAME_LIBC[1]}.tar.bz2" ]]; then
 		if [[ $BUILD_LIBC -eq 1 ]]; then
 			log "${NAME_LIBC[1]}"
-			wget "https://github.com/avrdudes/avr-libc/releases/download/${NAME_LIBC[0]}/${NAME_LIBC[1]}.tar.bz2"
+			wget "$LIBC_SOURCE"
 		fi
 	fi
 
