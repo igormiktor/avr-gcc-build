@@ -286,6 +286,9 @@ buildGCC()
 	cd "$NAME_GCC"
 	
 	log "Getting prerequisites..."
+	# Fix up older versions of download_prerequisites
+	# (Does no harm to newer versions)
+	sed -i 's/ftp/https/g' ./contrib/download_prerequisites
 	chmod +x ./contrib/download_prerequisites
 	./contrib/download_prerequisites
 
