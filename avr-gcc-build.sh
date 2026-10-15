@@ -3,7 +3,7 @@
 # avr-gcc-build
 # https://blog.zakkemble.net/avr-gcc-builds/
 # https://github.com/ZakKemble/avr-gcc-build
-# Copyright (C) 2017-2025, Zak Kemble
+# Copyright (C) 2017-2026, Zak Kemble
 # Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
 # http://creativecommons.org/licenses/by-sa/4.0/
 
@@ -22,7 +22,7 @@ backtrace()
         local line="${BASH_LINENO[$((i-1))]}"
         local src="${BASH_SOURCE[$((i-1))]}"
 		# shellcheck disable=SC2086
-        printf '%*s' $i '' # indent
+        printf '%*s' "$i" '' # indent
         echo "at: $func(), $src, line $line"
     done
 }
@@ -57,9 +57,6 @@ fi
 # Some systems with not much RAM may fail with "collect2: fatal error: ld terminated with signal 9 [Killed]".
 # If this happens try reducing the JOBCOUNT value or add more RAM.
 JOBCOUNT=${JOBCOUNT:-$(getconf _NPROCESSORS_ONLN)}
-
-# Keep downloaded sources around (to avoid needing to redownload them)
-KEEP_DOWNLOADS=${KEEP_DOWNLOADS:-1}
 
 # Build for Linux
 # A Linux AVR-GCC toolchain is required to build a Windows toolchain
@@ -117,7 +114,7 @@ else
 fi
 
 # Output locations for built toolchains
-BASE=${BASE:-${CWD}/build/}
+BASE=${BASE:-$CWD/build/}
 PREFIX_GCC_LINUX=${BASE}avr-${NAME_GCC}-x64-linux
 PREFIX_GCC_WINX86=${BASE}avr-${NAME_GCC}-x86-windows
 PREFIX_GCC_WINX64=${BASE}avr-${NAME_GCC}-x64-windows
@@ -136,39 +133,39 @@ fi
 #export CFLAGS="-static --static"
 #export CXXFLAGS="${CFLAGS}"
 
-OPTS_BINUTILS="
-	--target=avr
-	--disable-nls
-	--disable-werror
-"
+OPTS_BINUTILS=(
+	"--target=avr"
+	"--disable-nls"
+	"--disable-werror"
+)
 
-OPTS_GCC="
-	--target=avr
-	--enable-languages=c,c++
-	--disable-nls
-	--disable-libssp
-	--disable-libada
-	--with-dwarf2
-	--disable-shared
-	--enable-static
-	--enable-mingw-wildcard
-	--enable-plugin
-	--with-gnu-as
-	--with-gnu-ld
-	--without-zstd
-"
+OPTS_GCC=(
+	"--target=avr"
+	"--enable-languages=c,c++"
+	"--disable-nls"
+	"--disable-libssp"
+	"--disable-libada"
+	"--with-dwarf2"
+	"--disable-shared"
+	"--enable-static"
+	"--enable-mingw-wildcard"
+	"--enable-plugin"
+	"--with-gnu-as"
+	"--with-gnu-ld"
+	"--without-zstd"
+)
 
-OPTS_GDB="
-	--target=avr
-	--with-static-standard-libraries
-	--with-expat
-"
+OPTS_GDB=(
+	"--target=avr"
+	"--with-static-standard-libraries"
+	"--with-expat"
+)
 # --disable-source-highlight
 
-OPTS_LIBC=""
+OPTS_LIBC=()
 
-TMP_DIR=${CWD}/tmp
-LOG_DIR=${CWD}
+TMP_DIR=$CWD/tmp
+LOG_DIR=$CWD
 
 log()
 {
@@ -179,8 +176,8 @@ log()
 installPackages()
 {
 	local requiredPackages=("wget" "make" "gcc" "g++" "bzip2" "xz-utils" "autoconf" "texinfo" "libgmp-dev" "libmpfr-dev" "libexpat1-dev")
-	if [[ $FOR_WINX64 -ne 0 ]] || [[ $FOR_WINX86 -ne 0 ]]; then
-			requiredPackages+=("mingw-w64")
+	if [[ $FOR_WINX64 -ne 0 || $FOR_WINX86 -ne 0 ]]; then
+		requiredPackages+=("mingw-w64")
 	fi
 
 	if [[ $EUID -ne 0 ]]; then
@@ -211,6 +208,30 @@ makeDir()
 {
 	rm -rf "$1"
 	mkdir -p "$1"
+}
+
+# shellcheck disable=SC2329
+fixGCCAVR()
+{
+	# In GCC 7.1.0 there seems to be an issue with INT8_MAX and some other things being undefined in /gcc/config/avr/avr.c when building for Windows.
+	# Adding '#include <stdint.h>' doesn't fix it, but manually defining the values does the trick.
+
+	echo "Fixing missing defines..."
+
+	DEFSFIX="
+		#if (defined _WIN32 || defined __CYGWIN__)
+		#define INT8_MIN (-128)
+		#define INT16_MIN (-32768)
+		#define INT8_MAX 127
+		#define INT16_MAX 32767
+		#define UINT8_MAX 0xff
+		#define UINT16_MAX 0xffff
+		#endif
+	"
+
+	ORIGINAL=$(cat ../gcc/config/avr/avr.c)
+	echo "$DEFSFIX" > ../gcc/config/avr/avr.c
+	echo "$ORIGINAL" >> ../gcc/config/avr/avr.c
 }
 
 cleanup()
@@ -272,16 +293,26 @@ downloadSources()
 		fi
 	fi
 
-#	[[ $BUILD_MAKE -eq 1 ]] && wget http://ftp.gnu.org/gnu/make/$NAME_MAKE.tar.gz
-#	[[ $BUILD_COREUTILS -eq 1 ]] && wget https://ftp.gnu.org/gnu/coreutils/$NAME_COREUTILS.tar.xz
+#	[[ $BUILD_MAKE -eq 1 ]] && wget "http://ftp.gnu.org/gnu/make/$NAME_MAKE.tar.gz"
+#	[[ $BUILD_COREUTILS -eq 1 ]] && wget "https://ftp.gnu.org/gnu/coreutils/$NAME_COREUTILS.tar.xz"
 }
 
 confMake()
 {
-	# shellcheck disable=SC2086
-	../configure --prefix="$1" $2 $3 --build="$(${4:-../config.guess})"
-	# shellcheck disable=SC2086
-	make -j $JOBCOUNT
+	local prefix="$1"
+	local build
+
+	if [[ -n "${2:-}" ]]; then
+		build="$("$2")"
+	else
+		build="$(../config.guess)"
+	fi
+
+	shift 2 || true
+
+	../configure --prefix="$prefix" --build="$build" "$@"
+
+	make -j "$JOBCOUNT"
 	make install-strip
 	rm -rf -- *
 }
@@ -296,9 +327,9 @@ buildBinutils()
 	mkdir -p "$NAME_BINUTILS/obj-avr"
 	cd "$NAME_BINUTILS/obj-avr"
 
-	[[ $FOR_LINUX -eq 1 ]] && log "Making for Linux..." && confMake "$PREFIX_GCC_LINUX" "$OPTS_BINUTILS"
-	[[ $FOR_WINX86 -eq 1 ]] && log "Making for Windows x86..." && confMake "$PREFIX_GCC_WINX86" "$OPTS_BINUTILS" --host=$HOST_WINX86
-	[[ $FOR_WINX64 -eq 1 ]] && log "Making for Windows x64..." && confMake "$PREFIX_GCC_WINX64" "$OPTS_BINUTILS" --host=$HOST_WINX64
+	[[ $FOR_LINUX -eq 1 ]] && log "Making for Linux..." && confMake "$PREFIX_GCC_LINUX" "" "${OPTS_BINUTILS[@]}"
+	[[ $FOR_WINX86 -eq 1 ]] && log "Making for Windows x86..." && confMake "$PREFIX_GCC_WINX86" "" "${OPTS_BINUTILS[@]}" --host="$HOST_WINX86"
+	[[ $FOR_WINX64 -eq 1 ]] && log "Making for Windows x64..." && confMake "$PREFIX_GCC_WINX64" "" "${OPTS_BINUTILS[@]}" --host="$HOST_WINX64"
 
 	cd ../../
 }
@@ -312,7 +343,7 @@ buildGCC()
 	tar xf "$NAME_GCC.tar.xz"
 	mkdir -p "$NAME_GCC/obj-avr"
 	cd "$NAME_GCC"
-	
+
 	log "Getting prerequisites..."
 	# Fix up older versions of download_prerequisites
 	# (Does no harm to newer versions)
@@ -321,34 +352,12 @@ buildGCC()
 	./contrib/download_prerequisites
 
 	cd obj-avr
+	# fixGCCAVR
 
-	[[ $FOR_LINUX -eq 1 ]] && log "Making for Linux..." && confMake "$PREFIX_GCC_LINUX" "$OPTS_GCC"
-	[[ $FOR_WINX86 -eq 1 ]] && log "Making for Windows x86..." && confMake "$PREFIX_GCC_WINX86" "$OPTS_GCC" --host=$HOST_WINX86
-	[[ $FOR_WINX64 -eq 1 ]] && log "Making for Windows x64..." && confMake "$PREFIX_GCC_WINX64" "$OPTS_GCC" --host=$HOST_WINX64
+	[[ $FOR_LINUX -eq 1 ]] && log "Making for Linux..." && confMake "$PREFIX_GCC_LINUX" "" "${OPTS_GCC[@]}"
+	[[ $FOR_WINX86 -eq 1 ]] && log "Making for Windows x86..." && confMake "$PREFIX_GCC_WINX86" "" "${OPTS_GCC[@]}" --host="$HOST_WINX86"
+	[[ $FOR_WINX64 -eq 1 ]] && log "Making for Windows x64..." && confMake "$PREFIX_GCC_WINX64" "" "${OPTS_GCC[@]}" --host="$HOST_WINX64"
 
-	cd ../../
-}
-
-buildGDBWin()
-{
-	log "GMP..."
-	cd "$NAME_GMP/obj"
-	confMake "$TMP_DIR/$2" --host="$2"
-	cd ../../
-	
-	log "MPFR..."
-	cd "$NAME_MPFR/obj"
-	confMake "$TMP_DIR/$2" "--with-gmp=$TMP_DIR/$2 --disable-shared --enable-static" --host="$2"
-	cd ../../
-
-	log "Expat..."
-	cd "${NAME_EXPAT[1]}/obj"
-	confMake "$TMP_DIR/$2" "--disable-shared --enable-static" --host="$2" "../conftools/config.guess"
-	cd ../../
-
-	log "GDB..."
-	cd "$NAME_GDB/obj-avr"
-	confMake "$1" "--with-gmp=$TMP_DIR/$2 --with-mpfr=$TMP_DIR/$2 --with-libexpat-prefix=$TMP_DIR/$2 $OPTS_GDB" --host="$2"
 	cd ../../
 }
 
@@ -360,7 +369,7 @@ buildGDB()
 	log "Extracting..."
 	tar xf "$NAME_GDB.tar.xz"
 	mkdir -p "$NAME_GDB/obj-avr"
-	if [[ $FOR_WINX86 -ne 0 ]] || [[ $FOR_WINX64 -ne 0 ]]; then
+	if [[ $FOR_WINX86 -eq 1 ]] || [[ $FOR_WINX64 -eq 1 ]]; then
 		tar xf "$NAME_GMP.tar.xz"
 		mkdir -p "$NAME_GMP/obj"
 		tar xf "$NAME_MPFR.tar.xz"
@@ -372,19 +381,42 @@ buildGDB()
 	if [[ $FOR_LINUX -eq 1 ]]; then
 		log "Making for Linux..."
 		cd "$NAME_GDB/obj-avr"
-		confMake "$PREFIX_GCC_LINUX" "$OPTS_GDB"
+		confMake "$PREFIX_GCC_LINUX" "" "${OPTS_GDB[@]}"
 		cd ../../
 	fi
 
-	if  [[ $FOR_WINX86 -ne 0 ]] || [[ $FOR_WINX64 -ne 0 ]]; then
-		makeDir "$TMP_DIR"
-		[[ $FOR_WINX86 -eq 1 ]] && log "Making for Windows x86..." && buildGDBWin "$PREFIX_GCC_WINX86" $HOST_WINX86
-		[[ $FOR_WINX64 -eq 1 ]] && log "Making for Windows x64..." && buildGDBWin "$PREFIX_GCC_WINX64" $HOST_WINX64
+	buildGDBWin()
+	{
+		log "GMP..."
+		cd "$NAME_GMP/obj"
+		confMake "$TMP_DIR/$2" "" --host="$2"
+		cd ../../
+		
+		log "MPFR..."
+		cd "$NAME_MPFR/obj"
+		confMake "$TMP_DIR/$2" "" --with-gmp="$TMP_DIR/$2" --disable-shared --enable-static --host="$2"
+		cd ../../
+
+		log "Expat..."
+		cd "${NAME_EXPAT[1]}/obj"
+		confMake "$TMP_DIR/$2" "../conftools/config.guess" --disable-shared --enable-static --host="$2"
+		cd ../../
+
+		log "GDB..."
+		cd "$NAME_GDB/obj-avr"
+		confMake "$1" "" --with-gmp="$TMP_DIR/$2" --with-mpfr="$TMP_DIR/$2" --with-libexpat-prefix="$TMP_DIR/$2" "${OPTS_GDB[@]}" --host="$2"
+		cd ../../
+	}
+
+	if [[ $FOR_WINX86 -eq 1 ]]; then
+		log "Making for Windows x86..."
+		buildGDBWin "$PREFIX_GCC_WINX86" "$HOST_WINX86"
 	fi
 
-	# For some reason we need some random command here otherwise
-	# the script exits with no error when FOR_WINX64=0
-	# echo "" > /dev/null
+	if [[ $FOR_WINX64 -eq 1 ]]; then
+		log "Making for Windows x64..."
+		buildGDBWin "$PREFIX_GCC_WINX64" "$HOST_WINX64"
+	fi
 }
 
 buildAVRLIBC()
@@ -396,16 +428,15 @@ buildAVRLIBC()
 	bunzip2 -c "${NAME_LIBC[1]}.tar.bz2" | tar xf -
 	mkdir -p "${NAME_LIBC[1]}/obj-avr"
 	cd "${NAME_LIBC[1]}/obj-avr"
-	
+
 	log "Making..."
-	../configure "$OPTS_LIBC" --host=avr --build="$(../config.guess)"
-	# shellcheck disable=SC2086
-	make -j $JOBCOUNT
+	../configure "${OPTS_LIBC[@]}" --host=avr --build="$(../config.guess)"
+	make -j "$JOBCOUNT"
 
 	log "Installing into toolchains..."
-	[[ $FOR_LINUX -eq 1 ]] && log "Linux" && make install prefix="${PREFIX_GCC_LINUX}"
-	[[ $FOR_WINX86 -eq 1 ]] && log "Windows x86" && make install prefix="${PREFIX_GCC_WINX86}"
-	[[ $FOR_WINX64 -eq 1 ]] && log "Windows x64" && make install prefix="${PREFIX_GCC_WINX64}"
+	[[ $FOR_LINUX -eq 1 ]] && log "Linux" && make install prefix="$PREFIX_GCC_LINUX"
+	[[ $FOR_WINX86 -eq 1 ]] && log "Windows x86" && make install prefix="$PREFIX_GCC_WINX86"
+	[[ $FOR_WINX64 -eq 1 ]] && log "Windows x64" && make install prefix="$PREFIX_GCC_WINX64"
 
 	cd ../../
 }
@@ -416,15 +447,15 @@ log "Start"
 
 TIME_START=$(date +%s)
 
-export PATH="$PREFIX_GCC_LINUX"/bin:"$PATH"
+export PATH="$PREFIX_GCC_LINUX/bin:$PATH"
 export CC=""
 
 cleanup
 downloadSources
 buildBinutils
 buildGCC
-buildAVRLIBC
 buildGDB
+buildAVRLIBC
 
 TIME_END=$(date +%s)
 TIME_RUN=$((TIME_END - TIME_START))
